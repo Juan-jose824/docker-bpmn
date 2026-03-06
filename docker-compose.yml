@@ -1,0 +1,80 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: bpmn-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./bpmn_script.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - bpmn-net
+
+  backend:
+    build:
+      context: ../back-bpmn
+      dockerfile: Dockerfile
+    container_name: bpmn-backend
+    restart: unless-stopped
+    environment:
+      DB_USER: ${DB_USER}
+      DB_HOST: db
+      DB_NAME: ${DB_NAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: 5432
+    volumes:
+      - uploads_data:/app/uploads
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - bpmn-net
+
+  frontend:
+    build:
+      context: ../front-bpmn
+      dockerfile: Dockerfile
+    container_name: bpmn-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - ai-service
+    networks:
+      - bpmn-net
+
+  ai-service:
+    build:
+      context: ../ai-service
+      dockerfile: Dockerfile
+    container_name: ai-service
+    restart: unless-stopped
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - PORT=4000
+      - NODE_OPTIONS=--max-old-space-size=4096
+    ports:
+      - "4000:4000"
+    depends_on:
+      - backend
+    networks:
+      - bpmn-net
+
+networks:
+  bpmn-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  uploads_data:
