@@ -1,4 +1,7 @@
+version: "3.9"
+
 services:
+
   db:
     image: postgres:16-alpine
     container_name: bpmn-db
@@ -61,13 +64,26 @@ services:
     container_name: ai-service
     restart: unless-stopped
     environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - PORT=4000
-      - NODE_OPTIONS=--max-old-space-size=4096
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      PORT: 4000
+      NODE_OPTIONS: --max-old-space-size=4096
+      OPENCLAW_URL: http://openclaw:3333
     ports:
       - "4000:4000"
     depends_on:
       - backend
+      - openclaw
+    networks:
+      - bpmn-net
+
+  openclaw:
+    image: ghcr.io/openclaw/openclaw:latest
+    container_name: openclaw
+    restart: unless-stopped
+    ports:
+      - "3333:3333"
+    volumes:
+      - openclaw_data:/root/.openclaw
     networks:
       - bpmn-net
 
@@ -78,3 +94,4 @@ networks:
 volumes:
   postgres_data:
   uploads_data:
+  openclaw_data:
